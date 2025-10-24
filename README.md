@@ -18,7 +18,29 @@ The library has a simple doxygen-documented API for loading TTF files and conver
 |examples/src/ttf2obj.c         |Console application for converting TTF font input file to a Wavefront object file (.obj). Each object in the output file includes the plane geometry of the corresponding glyph and its parameters: Unicode ID, advance and bearing.|
 ||![image](https://raw.githubusercontent.com/fetisov/ttf2mesh/assets/objfile.png)|
 
-To compile examples on Linux system you can use the GNU make utility: `make -C examples/build-linux-make all`. In the Windows operating system, you can use for compilation the Microsoft Visual Studio C++ project files that are located in the `examples/build-win-msvc` directory. Additionally, the `examples\build-any-qmake` directory contains pro files for building examples using the qtcreator IDE.
+## Platform Support
+
+ttf2mesh supports the following platforms:
+- **Linux** - Full support with system font discovery
+- **Windows** - Full support with system font discovery
+- **macOS** - Full support with system font discovery (added in this fork)
+- **Android** - Full support with system font discovery
+
+### Building Examples
+
+- **Linux**: Use the GNU make utility: `make -C examples/build-linux-make all`
+- **Windows**: Use Microsoft Visual Studio C++ project files in `examples/build-win-msvc` directory
+- **macOS**: Same as Linux (uses dirent and POSIX APIs)
+- **Any platform**: Use qtcreator IDE with pro files in `examples/build-any-qmake` directory
+
+### macOS Support
+
+This fork adds full macOS support, including:
+- Automatic detection of macOS platform (`__APPLE__` / `__MACH__`)
+- System font directory scanning (`/System/Library/Fonts`, `/Library/Fonts`, `~/Library/Fonts`)
+- Uses `stat()` for file type detection (macOS `dirent` doesn't reliably support `d_type`)
+
+**Note for Rust users:** When building with the `cc` crate on macOS, avoid using the `-D_POSIX_C_SOURCE=199309L` flag to ensure `snprintf()` is available. Use `_DARWIN_C_SOURCE` instead.
 
 You can read information on how the library works at [this link](https://habr.com/post/501268).
 

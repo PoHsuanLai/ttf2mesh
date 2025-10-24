@@ -46,6 +46,13 @@
 #   define _DEFAULT_SOURCE 1
 #   define PATH_SEP '/'
 #   include <dirent.h>
+#elif defined(__APPLE__) || defined(__MACH__)
+#   define TTF_MACOS
+#   define _DARWIN_C_SOURCE 1
+#   define PATH_SEP '/'
+#   include <dirent.h>
+#   include <sys/syslimits.h>
+#   include <sys/stat.h>
 #elif defined(__WINNT__) || defined(_WIN32) || defined(_WIN64)
 #   define TTF_WINDOWS
 #   define _CRT_SECURE_NO_WARNINGS
@@ -87,6 +94,11 @@
     "/usr/share/fonts",       \
     "/usr/local/share/fonts", \
     "~/.fonts"
+
+#define MACOS_FONTS_PATH      \
+    "/System/Library/Fonts",  \
+    "/Library/Fonts",         \
+    "~/Library/Fonts"
 
 #define WINDOWS_FONTS_PATH    \
     "C:\\Windows\\Fonts"
@@ -1929,6 +1941,78 @@ static ttf_t **load_fonts_from_dir(ttf_t **list, int *count, int *cap, const cha
 
     return list;
 }
+#elif defined(TTF_MACOS)
+static ttf_t **load_fonts_from_dir(ttf_t **list, int *count, int *cap, const char *dir, char *fullpath, int deepmax, const char *mask)
+{
+    DIR *d;
+    struct dirent *entry;
+    int flen;
+    struct stat st;
+
+    flen = strlen(fullpath);
+    if (!make_full_path(fullpath, dir)) return list;
+
+    d = opendir(fullpath);
+    if (d != NULL)
+        while ((entry = readdir(d)))
+        {
+            int old_len;
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+
+            old_len = strlen(fullpath);
+            if (!make_full_path(fullpath, entry->d_name)) continue;
+
+            if (stat(fullpath, &st) == 0)
+            {
+                if (S_ISDIR(st.st_mode))
+                {
+                    if (deepmax > 0)
+                    {
+                        fullpath[old_len] = 0;
+                        list = load_fonts_from_dir(list, count, cap, entry->d_name, fullpath, deepmax - 1, mask);
+                    }
+                    fullpath[old_len] = 0;
+                }
+                else if (S_ISREG(st.st_mode))
+                {
+                    ttf_t *font;
+                    if (!check_font_ext(entry->d_name)) {
+                        fullpath[old_len] = 0;
+                        continue;
+                    }
+                    if (!check_by_mask(entry->d_name, mask)) {
+                        fullpath[old_len] = 0;
+                        continue;
+                    }
+                    ttf_load_from_file(fullpath, &font, true);
+                    fullpath[old_len] = 0;
+                    if (font == NULL)
+                        continue;
+                    if (*count == *cap - 1)
+                    {
+                        ttf_t **tmp;
+                        *cap *= 2;
+                        tmp = (ttf_t **)realloc(list, sizeof(ttf_t *) * *cap);
+                        if (tmp == NULL) break;
+                        list = tmp;
+                    }
+                    list[*count] = font;
+                    *count += 1;
+                }
+            }
+            else
+            {
+                fullpath[old_len] = 0;
+            }
+        }
+
+    if (d != NULL)
+        closedir(d);
+
+    fullpath[flen] = 0;
+
+    return list;
+}
 #elif defined(TTF_WINDOWS)
 static ttf_t **load_fonts_from_dir(ttf_t **list, int *count, int *cap, const char *dir, char *fullpath, int deepmax, const char *mask)
 {
@@ -2047,6 +2131,8 @@ ttf_t **ttf_list_system_fonts(const char *mask)
         ANDROID_FONTS_PATH
 #elif defined(TTF_LINUX)
         LINUX_FONTS_PATH
+#elif defined(TTF_MACOS)
+        MACOS_FONTS_PATH
 #elif defined(TTF_WINDOWS)
         WINDOWS_FONTS_PATH
 #endif
